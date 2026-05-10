@@ -2,17 +2,16 @@
 """Webhook server - terima pesan WA dari Fonnte, kirim ke Delisa ADK."""
 import json
 import os
-import urllib.request
-import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 
-load_dotenv("/home/tri/delisa-lazizah/.env")
+# Cukup panggil load_dotenv() tanpa path, Railway akan ambil dari tab Variables
+load_dotenv() 
 
-ADK_URL = "http://127.0.0.1:8080"
+# Jika Delisa ADK berjalan di proyek yang sama, gunakan 0.0.0.0
+# Jika berbeda, masukkan URL publik ADK Anda
+ADK_URL = os.getenv("ADK_URL", "http://0.0.0.0:8080") 
 FONNTE_TOKEN = os.getenv("FONNTE_TOKEN", "")
 APP_NAME = "customer_service"
-
 
 def get_or_create_session(user_id: str) -> str:
     """Buat atau ambil session ADK berdasarkan nomor WA."""
@@ -139,8 +138,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("WEBHOOK_PORT", "8090"))
+    # Railway mengirimkan variabel "PORT", bukan "WEBHOOK_PORT"
+    port = int(os.environ.get("PORT", 8000)) 
+    
+    # Pastikan mengikat ke 0.0.0.0 agar bisa diakses dari luar Railway
     server = HTTPServer(("0.0.0.0", port), WebhookHandler)
     print(f"Webhook server berjalan di port {port}")
-    print(f"ADK URL: {ADK_URL}")
     server.serve_forever()
