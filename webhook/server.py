@@ -2,6 +2,9 @@
 """Webhook server - terima pesan WA dari Fonnte, kirim ke Delisa ADK."""
 import json
 import os
+import urllib.request
+import urllib.parse  # Tambahkan ini
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 
 # Cukup panggil load_dotenv() tanpa path, Railway akan ambil dari tab Variables
