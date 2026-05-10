@@ -1,0 +1,380 @@
+"""Tools untuk Delisa - Lazizah Aqiqah."""
+import csv
+import urllib.request
+import datetime
+import json
+import os
+
+
+HISTORY_CHAT_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=YOUR_HISTORY_GID&single=true&output=csv"
+)
+
+SPREADSHEET_ID = "10LeV9CV6w4AO35qwG3XhFYbSu_7IRgF5C87QS56phys"
+HISTORY_SHEET_NAME = "history_chat"
+
+STOK_KAMBING_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=1312921847&single=true&output=csv"
+)
+PRODUK_LAYANAN_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=567697577&single=true&output=csv"
+)
+SETTING_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=0&single=true&output=csv"
+)
+JADWAL_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=106223976&single=true&output=csv"
+)
+FAQ_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQEP0hnB2dzF6qd1YMCZTXPYlDTWsPuMdJkcNjFP3iab68h3HzTTkBkYrtXcvMK8WjaIx46o4HvJxpK"
+    "/pub?gid=1804968381&single=true&output=csv"
+)
+
+SETTING_OPERASIONAL = {
+    "area_layanan", "jam_operasional", "rekening_bank",
+    "nomor_kontak_whatsapp", "kontak_email", "alamat_kantor_pusat",
+    "promo_urgency", "filosofi_bisnis", "aturan_syariat",
+    "keunggulan_1", "keunggulan_2", "keunggulan_3", "keunggulan_4",
+    "keunggulan_5", "keunggulan_6", "keunggulan_7", "keunggulan_8",
+    "flow_1", "flow_2", "flow_3", "flow_4", "flow_5",
+    "kata_ganti_sapaan", "persona",
+    "instruksi_1", "instruksi_2", "instruksi_3", "instruksi_4", "instruksi_5",
+}
+
+
+def _fetch_csv(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        content = response.read().decode("utf-8", errors="ignore")
+    reader = csv.DictReader(content.splitlines())
+    return [{k.strip(): v.strip() for k, v in row.items() if k} for row in reader]
+
+
+def cek_stok_kambing(jenis_kelamin=None):
+    """Cek stok kambing. Parameter: jenis_kelamin (Jantan/Betina, opsional)."""
+    try:
+        rows = _fetch_csv(STOK_KAMBING_URL)
+        tersedia = []
+        habis = []
+        for row in rows:
+            stok = int(row.get("stok_tersedia", 0))
+            if jenis_kelamin and jenis_kelamin.lower() not in row.get("jenis_kelamin", "").lower():
+                continue
+            nama = row.get("jenis_kambing", "").replace("_", " ")
+            info = (nama + " | Usia: " + row.get("usia (bulan)", "-") + " bln"
+                    + " | Berat: " + row.get("berat (kg)", "-") + " kg"
+                    + " | " + row.get("jenis_kelamin", "-")
+                    + " | " + row.get("status_syariat", "-")
+                    + " | Stok: " + str(stok) + " ekor")
+            if stok > 0:
+                tersedia.append(info)
+            else:
+                habis.append(info)
+        if not tersedia and not habis:
+            return "Data stok tidak ditemukan."
+        hasil = "Stok Kambing Lazizah\n" + "="*30 + "\n"
+        if tersedia:
+            hasil += "Tersedia:\n" + "\n".join(tersedia)
+        if habis:
+            hasil += "\nHabis:\n" + "\n".join(habis)
+        return hasil
+    except Exception as e:
+        return "Error stok: " + str(e)
+
+
+def cek_paket_layanan():
+    """Ambil daftar paket aqiqah beserta harga."""
+    try:
+        rows = _fetch_csv(PRODUK_LAYANAN_URL)
+        if not rows:
+            return "Data paket tidak ditemukan."
+        hasil = "Paket Aqiqah Lazizah\n" + "="*30 + "\n\n"
+        for row in rows:
+            nama = row.get("nama_paket", "-").replace("_", " ").title()
+            desk = row.get("deskripsi", "-")
+            harga_raw = row.get("harga", "0").replace(",", "")
+            try:
+                harga = "Rp " + "{:,}".format(int(float(harga_raw))).replace(",", ".")
+            except ValueError:
+                harga = harga_raw
+            hasil += nama + "\n" + desk + "\nHarga: " + harga + "\n" + "-"*25 + "\n\n"
+        hasil += "Harga dapat berubah. Hubungi kami untuk info terkini."
+        return hasil
+    except Exception as e:
+        return "Error paket: " + str(e)
+
+
+def cek_setting(key=None):
+    """Ambil info operasional Lazizah. Parameter: key (opsional)."""
+    try:
+        rows = _fetch_csv(SETTING_URL)
+        data = {}
+        for row in rows:
+            k = row.get("key", "").strip()
+            v = row.get("value", "").strip()
+            if k in SETTING_OPERASIONAL:
+                data[k] = v
+        if not data:
+            return "Setting tidak ditemukan."
+        if key:
+            key_clean = key.strip().lower()
+            for k, v in data.items():
+                if key_clean in k.lower():
+                    return k + ": " + v
+            return "Key tidak ditemukan: " + key
+        hasil = "Info Layanan Lazizah\n" + "="*30 + "\n"
+        for k, v in data.items():
+            hasil += k + ": " + v + "\n"
+        return hasil
+    except Exception as e:
+        return "Error setting: " + str(e)
+
+
+def cek_jadwal(tanggal=None):
+    """Cek jadwal aqiqah tersedia. Parameter: tanggal format YYYY-MM-DD (opsional)."""
+    try:
+        rows = _fetch_csv(JADWAL_URL)
+        tersedia = []
+        penuh = []
+        for row in rows:
+            tgl = row.get("tanggal", "").strip()
+            if not tgl:
+                continue
+            if tanggal and tanggal not in tgl:
+                continue
+            slot = row.get("slot_tersedia", "0").strip()
+            alamat = row.get("alamat", "-").strip()
+            status = row.get("status", "").strip().lower()
+            entry = tgl + " - " + slot + " slot | " + alamat
+            if status == "tersedia" and slot != "0":
+                tersedia.append(entry)
+            else:
+                penuh.append(tgl + " - Penuh")
+        if not tersedia and not penuh:
+            return "Belum ada jadwal tercatat. Hubungi kami langsung."
+        hasil = "Jadwal Aqiqah Lazizah\n" + "="*30 + "\n"
+        if tersedia:
+            hasil += "Tersedia:\n" + "\n".join(tersedia)
+        if penuh:
+            hasil += "\nPenuh:\n" + "\n".join(penuh)
+        hasil += "\nSegera konfirmasi untuk booking."
+        return hasil
+    except Exception as e:
+        return "Error jadwal: " + str(e)
+
+
+def cek_faq(pertanyaan):
+    """Cari jawaban FAQ. Parameter: pertanyaan (kata kunci)."""
+    try:
+        rows = _fetch_csv(FAQ_URL)
+        if not rows:
+            return "FAQ tidak tersedia."
+        pertanyaan_lower = pertanyaan.lower().strip()
+        for row in rows:
+            keywords = row.get("question", "").lower().strip()
+            answer = row.get("answer", "").strip()
+            if not keywords or not answer:
+                continue
+            for kw in keywords.split(","):
+                if kw.strip() in pertanyaan_lower or pertanyaan_lower in kw.strip():
+                    return answer
+        return "Tidak ada FAQ cocok untuk: " + pertanyaan
+    except Exception as e:
+        return "Error FAQ: " + str(e)
+
+def catat_prospek(
+    nama_pelanggan: str,
+    paket_diminati: str = None,
+    tanggal_acara: str = None,
+    catatan: str = None,
+) -> str:
+    """
+    Catat data prospek pelanggan yang menunjukkan minat pesan.
+    Gunakan saat pelanggan:
+    - Menyebut ingin pesan / mau order
+    - Sudah pilih paket tertentu
+    - Menyebut tanggal acara
+    - Minta dihubungi kembali
+
+    Args:
+        nama_pelanggan: Nama pelanggan dari percakapan.
+        paket_diminati: Nama paket yang diminati (opsional).
+        tanggal_acara: Tanggal aqiqah yang diinginkan (opsional).
+        catatan: Informasi tambahan relevan (opsional).
+
+    Returns:
+        Konfirmasi pencatatan dan instruksi lanjutan untuk pelanggan.
+    """
+    try:
+        # Ambil API key dari environment
+        api_key = os.getenv("GOOGLE_API_KEY", "")
+        sheets_api_key = os.getenv("GOOGLE_SHEETS_API_KEY", api_key)
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Data yang akan dicatat
+        data_prospek = {
+            "timestamp": timestamp,
+            "nama": nama_pelanggan,
+            "paket": paket_diminati or "-",
+            "tanggal_acara": tanggal_acara or "-",
+            "catatan": catatan or "-",
+            "status": "prospek_baru",
+        }
+
+        # Simpan ke file lokal sebagai fallback
+        log_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "../../prospek_log.jsonl"
+        )
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(data_prospek, ensure_ascii=False) + "\n")
+
+        # Format pesan konfirmasi untuk pelanggan
+        konfirmasi = (
+            "Baik, " + nama_pelanggan + "! Data Bapak/Ibu sudah saya catat.\n\n"
+            "Ringkasan:\n"
+            "- Nama: " + nama_pelanggan + "\n"
+            "- Paket: " + (paket_diminati or "belum dipilih") + "\n"
+            "- Tanggal: " + (tanggal_acara or "belum ditentukan") + "\n\n"
+            "Tim Lazizah akan segera menghubungi untuk konfirmasi. "
+            "Atau Bapak/Ibu bisa langsung WhatsApp kami untuk proses lebih cepat."
+        )
+        return konfirmasi
+
+    except Exception as e:
+        return "Data tercatat. Tim kami akan segera menghubungi. (ref: " + str(e)[:20] + ")"
+
+def get_tanggal_hari_ini() -> str:
+    """
+    Ambil informasi hari, tanggal, dan waktu saat ini (WIB).
+    Gunakan saat pelanggan menyebut 'hari ini', 'besok', 'minggu ini',
+    atau saat menyimpan tanggal_acara tanpa tahun yang jelas.
+
+    Returns:
+        Informasi hari dan tanggal lengkap dalam format Indonesia.
+    """
+    import locale
+    now = datetime.datetime.now()
+
+    hari = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"]
+    bulan = ["","Januari","Februari","Maret","April","Mei","Juni",
+             "Juli","Agustus","September","Oktober","November","Desember"]
+
+    nama_hari = hari[now.weekday()]
+    nama_bulan = bulan[now.month]
+
+    return (
+        "Hari ini: " + nama_hari + ", "
+        + str(now.day) + " " + nama_bulan + " " + str(now.year)
+        + " | Pukul: " + now.strftime("%H:%M") + " WIB"
+        + " | Format ISO: " + now.strftime("%Y-%m-%d")
+    )
+
+
+def simpan_prospek(nama_pelanggan, paket_diminati=None, tanggal_acara=None, catatan=None):
+    """
+    Simpan prospek ke Supabase dan kirim notif WA ke pemilik.
+    Gunakan saat pelanggan konfirmasi mau pesan atau minta dihubungi.
+    Args:
+        nama_pelanggan: Nama pelanggan dari percakapan.
+        paket_diminati: Paket yang diminati (opsional).
+        tanggal_acara: Tanggal acara format YYYY-MM-DD (opsional).
+        catatan: Info tambahan (opsional).
+    Returns:
+        Konfirmasi pencatatan untuk pelanggan.
+    """
+    import urllib.parse
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    fonnte_token = os.getenv("FONNTE_TOKEN", "")
+    fonnte_target = os.getenv("FONNTE_TARGET", "")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    paket = paket_diminati or "-"
+    tgl = tanggal_acara or "-"
+    ket = catatan or "-"
+    supabase_ok = False
+    try:
+        from supabase import create_client
+        sb = create_client(supabase_url, supabase_key)
+        sb.table("prospek").insert({
+            "nama_pelanggan": nama_pelanggan,
+            "paket_diminati": paket,
+            "tanggal_acara": tgl,
+            "catatan": ket,
+            "status": "prospek_baru",
+            "notif_wa_terkirim": False,
+        }).execute()
+        supabase_ok = True
+    except Exception as e:
+        supabase_ok = False
+    try:
+        log_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "../../prospek_log.jsonl"
+        )
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "timestamp": timestamp,
+                "nama": nama_pelanggan,
+                "paket": paket,
+                "tanggal_acara": tgl,
+                "catatan": ket,
+                "status": "prospek_baru",
+                "supabase": supabase_ok,
+            }, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    wa_ok = False
+    try:
+        pesan = (
+            "PROSPEK BARU - Lazizah Aqiqah" + "\n\n"
+            "Nama: " + nama_pelanggan + "\n"
+            "Paket: " + paket + "\n"
+            "Tanggal: " + tgl + "\n"
+            "Catatan: " + ket + "\n"
+            "Waktu: " + timestamp + "\n\n"
+            "Segera hubungi pelanggan untuk konfirmasi!"
+        )
+        payload = urllib.parse.urlencode({
+            "target": fonnte_target,
+            "message": pesan,
+            "countryCode": "62",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.fonnte.com/send",
+            data=payload,
+            headers={"Authorization": fonnte_token},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            wa_ok = result.get("status", False)
+    except Exception as e:
+        wa_ok = False
+    if supabase_ok and wa_ok:
+        try:
+            sb.table("prospek").update(
+                {"notif_wa_terkirim": True}
+            ).eq("nama_pelanggan", nama_pelanggan).execute()
+        except Exception:
+            pass
+    return (
+        "Baik, " + nama_pelanggan + "! Data sudah tercatat.\n\n"
+        "Ringkasan:\n"
+        "- Nama: " + nama_pelanggan + "\n"
+        "- Paket: " + paket + "\n"
+        "- Tanggal: " + tgl + "\n\n"
+        "Tim Lazizah akan segera menghubungi untuk konfirmasi."
+    )
